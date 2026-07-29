@@ -21,7 +21,12 @@ output "feature_store_table" {
 
 output "sagemaker_endpoint" {
   description = "Nombre del endpoint de SageMaker"
-  value       = module.sagemaker.sagemaker_endpoint_name
+  value       = try(module.sagemaker[0].sagemaker_endpoint_name, "")
+}
+
+output "sagemaker_endpoint_arn" {
+  description = "ARN del endpoint de SageMaker"
+  value       = try(module.sagemaker[0].sagemaker_endpoint_arn, "")
 }
 
 output "alert_topic_arn" {

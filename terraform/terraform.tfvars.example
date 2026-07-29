@@ -8,5 +8,9 @@ private_subnets  = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
 db_username      = "finguard"
 db_password      = "changeme" # Cambiar en producción
 container_image  = "public.ecr.aws/aws/amazon-linux:latest" # Reemplazar por tu imagen ECR
-desired_count    = 2
+desired_count    = 1 # Free Tier / mínimo costo en dev
 sagemaker_s3_bucket = "finguard-sagemaker-artifacts"
+
+# Nota: en dev/staging se usan valores mínimos para evitar costos.
+# Aurora: db.t3.medium (considerar apagar en horas no productivas).
+# SageMaker: solo se crea en prod (condicional en main.tf).
