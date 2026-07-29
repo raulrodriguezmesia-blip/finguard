@@ -1,0 +1,85 @@
+name: FinGuard ML Retrain
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # Cada domingo a las 3 AM UTC
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force retrain even if drift is low'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  AWS_REGION: us-east-1
+  SAGEMAKER_S3_BUCKET: finguard-sagemaker-artifacts
+  SAGEMAKER_ENDPOINT: finguard-prod-endpoint
+  SAGEMAKER_ROLE: arn:aws:iam::123456789012:role/finguard-prod-sagemaker-role
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install boto3 scikit-learn joblib pandas numpy
+
+      - name: Train and package model
+        run: python scripts/generate_sagemaker_model.py
+
+      - name: Register new model version in SageMaker
+        run: |
+          MODEL_NAME=fraud-detection
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          NEW_MODEL_NAME="${MODEL_NAME}-${TIMESTAMP}"
+
+          aws sagemaker create-model \
+            --model-name ${NEW_MODEL_NAME} \
+            --primary-container ImageUri=683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-scikit-learn:1.0-1-cpu-py310,ModelDataUrl=s3://${{ env.SAGEMAKER_S3_BUCKET }}/models/fraud-detection-v1/model.tar.gz \
+            --execution-role-arn ${{ env.SAGEMAKER_ROLE }}
+
+          aws sagemaker create-endpoint-config \
+            --endpoint-config-name ${MODEL_NAME}-config-${TIMESTAMP} \
+            --production-variants "[{\"VariantName\":\"AllTraffic\",\"ModelName\":\"${NEW_MODEL_NAME}\",\"InstanceType\":\"ml.t2.medium\",\"InitialInstanceCount\":1}]"
+
+          aws sagemaker update-endpoint \
+            --endpoint-name ${{ env.SAGEMAKER_ENDPOINT }} \
+            --endpoint-config-name ${MODEL_NAME}-config-${TIMESTAMP}}
+
+      - name: Wait for endpoint deployment
+        run: |
+          aws sagemaker wait endpoint-in-service --endpoint-name ${{ env.SAGEMAKER_ENDPOINT }}
+
+      - name: Notify success
+        if: success()
+        run: |
+          aws sns publish \
+            --topic-arn arn:aws:sns:us-east-1:123456789012:finguard-prod-fraud-alerts \
+            --subject "FinGuard: Modelo reentrenado exitosamente" \
+            --message "El modelo de fraude ha sido reentrenado y desplegado en SageMaker endpoint ${{ env.SAGEMAKER_ENDPOINT }}"
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          aws sns publish \
+            --topic-arn arn:aws:sns:us-east-1:123456789012:finguard-prod-fraud-alerts \
+            --subject "FinGuard: Fallo en reentrenamiento de modelo" \
+            --message "El pipeline de reentrenamiento del modelo de fraude falló. Revisar logs en GitHub Actions."
