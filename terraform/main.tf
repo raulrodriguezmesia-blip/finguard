@@ -79,6 +79,7 @@ module "ecs_fargate" {
   cpu                = 256
   memory             = 512
   sns_topic_arn      = module.sns.alert_topic_arn
+  secrets_manager_arn = "" # Dejar vacío para no requerir secreto en dev; se completa en prod
 }
 
 module "sagemaker" {

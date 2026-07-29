@@ -70,3 +70,9 @@ variable "sagemaker_s3_bucket" {
   type        = string
   default     = "finguard-sagemaker-artifacts"
 }
+
+variable "secrets_manager_arn" {
+  description = "ARN del secreto de base de datos en AWS Secrets Manager"
+  type        = string
+  default     = ""
+}

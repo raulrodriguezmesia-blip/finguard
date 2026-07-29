@@ -59,6 +59,12 @@ variable "memory" {
   default = 512
 }
 
+variable "secrets_manager_arn" {
+  type        = string
+  description = "ARN del secreto de base de datos en AWS Secrets Manager"
+  default     = ""
+}
+
 variable "sns_topic_arn" {
   type = string
 }
@@ -132,12 +138,12 @@ resource "aws_ecs_task_definition" "app" {
           value = "finguard"
         }
       ]
-      secrets = [
+      secrets = length(var.secrets_manager_arn) > 0 ? [
         {
           name      = "SPRING_DATASOURCE_PASSWORD"
-          valueFrom = "arn:aws:secretsmanager:us-east-1:123456789012:secret:finguard/db_password"
+          valueFrom = var.secrets_manager_arn
         }
-      ]
+      ] : []
     }
   ])
 
