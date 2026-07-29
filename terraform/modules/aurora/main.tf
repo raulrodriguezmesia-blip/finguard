@@ -1,27 +1,21 @@
-variable "name_prefix" {
-  type = string
+variable "db_instance_class" {
+  type    = string
+  default = "db.t3.medium"
+}
+
+variable "db_instance_count" {
+  type    = number
+  default = 1
+}
+
+variable "skip_final_snapshot" {
+  type    = bool
+  default = true
 }
 
 variable "environment" {
   type    = string
   default = "prod"
-}
-
-variable "vpc_id" {
-  type = string
-}
-
-variable "private_subnet_ids" {
-  type = list(string)
-}
-
-variable "db_username" {
-  type = string
-}
-
-variable "db_password" {
-  type      = string
-  sensitive = true
 }
 
 resource "aws_db_subnet_group" "aurora" {
@@ -69,8 +63,8 @@ resource "aws_rds_cluster" "aurora" {
   master_password         = var.db_password
   db_subnet_group_name    = aws_db_subnet_group.aurora.name
   vpc_security_group_ids  = [aws_security_group.aurora.id]
-  skip_final_snapshot     = true
-  backup_retention_period = 7
+  skip_final_snapshot     = var.skip_final_snapshot
+  backup_retention_period = var.environment == "prod" ? 7 : 1
 
   tags = {
     Name        = "${var.name_prefix}-aurora-cluster"
@@ -79,11 +73,11 @@ resource "aws_rds_cluster" "aurora" {
 }
 
 resource "aws_rds_cluster_instance" "aurora_instances" {
-  count              = 2
+  count              = var.db_instance_count
   identifier         = "${var.name_prefix}-aurora-instance-${count.index + 1}"
   cluster_identifier = aws_rds_cluster.aurora.id
   engine             = aws_rds_cluster.aurora.engine
-  instance_class     = "db.t3.medium"
+  instance_class     = var.db_instance_class
   db_subnet_group_name = aws_db_subnet_group.aurora.name
 
   tags = {

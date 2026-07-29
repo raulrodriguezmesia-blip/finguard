@@ -2,6 +2,10 @@ variable "name_prefix" {
   type = string
 }
 
+variable "project_name" {
+  type = string
+}
+
 variable "environment" {
   type    = string
   default = "prod"
@@ -13,10 +17,10 @@ variable "aws_region" {
 }
 
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "${var.name_prefix}-terraform-state"
+  bucket = "${var.project_name}-terraform-state"
 
   tags = {
-    Name        = "${var.name_prefix}-terraform-state"
+    Name        = "${var.project_name}-terraform-state"
     Environment = var.environment
   }
 }
@@ -47,7 +51,7 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
 }
 
 resource "aws_dynamodb_table" "terraform_locks" {
-  name         = "${var.name_prefix}-terraform-locks"
+  name         = "${var.project_name}-terraform-locks"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
 
@@ -57,7 +61,7 @@ resource "aws_dynamodb_table" "terraform_locks" {
   }
 
   tags = {
-    Name        = "${var.name_prefix}-terraform-locks"
+    Name        = "${var.project_name}-terraform-locks"
     Environment = var.environment
   }
 }

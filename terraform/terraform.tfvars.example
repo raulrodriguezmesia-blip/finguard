@@ -11,6 +11,8 @@ container_image  = "public.ecr.aws/aws/amazon-linux:latest" # Reemplazar por tu 
 desired_count    = 1 # Free Tier / mínimo costo en dev
 sagemaker_s3_bucket = "finguard-sagemaker-artifacts"
 
-# Nota: en dev/staging se usan valores mínimos para evitar costos.
-# Aurora: db.t3.medium (considerar apagar en horas no productivas).
-# SageMaker: solo se crea en prod (condicional en main.tf).
+# Free Tier / mínimo costo:
+# - Aurora: db.t3.micro en dev, db.t3.medium en prod
+# - SageMaker: solo se crea en prod
+# - ECS: 1 tarea en dev, 2 en prod
+# - DynamoDB: PAY_PER_REQUEST (sin costo si no se usa)
