@@ -97,6 +97,11 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>sagemakerruntime</artifactId>
         </dependency>
+        <!-- AWS SDK v2: Secrets Manager -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>secretsmanager</artifactId>
+        </dependency>
         <!-- Spring Cloud Stream for Kafka -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
