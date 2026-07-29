@@ -8,13 +8,14 @@
     <groupId>com.example</groupId>
     <artifactId>finguard</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>FinGuard</name>
-    <description>AI-Powered Fintech &amp; Cloud Observability Platform</description>
+    <name>FinGuard Experimental</name>
+    <description>Experimental branch: Java 25 + Spring Boot 3.3.x</description>
     <properties>
-        <java.version>21</java.version>
-        <spring.boot.version>3.2.5</spring.boot.version>
+        <java.version>25</java.version>
+        <spring.boot.version>3.3.0</spring.boot.version>
         <aws.java.sdk.v2.version>2.25.0</aws.java.sdk.v2.version>
         <spring.cloud.version>2023.0.3</spring.cloud.version>
+        <maven.compiler.release>25</maven.compiler.release>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -63,12 +64,6 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
-        </dependency>
-        <!-- H2 for tests -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
         </dependency>
         <!-- Spring Boot Actuator (for metrics) -->
         <dependency>
@@ -143,8 +138,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${maven.compiler.release}</release>
                 </configuration>
             </plugin>
         </plugins>
