@@ -86,9 +86,13 @@ public class FraudDetectionServiceImpl implements FraudDetectionService {
 
             // 3. Scoring híbrido: reglas + ML
             double ruleScore = calculateRuleBasedScore(transaction, features);
-            double mlScore = predictionTimer.record(() ->
-                predictionPort.predictFraudScore(features)
-            );
+            final double mlScore = predictionTimer.record(() -> {
+                try {
+                    return predictionPort.predictFraudScore(features);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
             // Combinar scores: weighted average (60% ML, 40% reglas)
             double combinedScore = (mlScore * 0.6) + (ruleScore * 0.4);
