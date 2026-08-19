@@ -1,218 +1,256 @@
-# FinGuard: AI-Powered Fintech & Cloud Observability Platform
+# AI-Powered Fintech & Cloud Observability Platform
 
-Un sistema de detección de fraude en tiempo real con arquitectura hexagonal, backend en Java/Spring Boot, desplegado en AWS con Terraform, CI/CD con GitHub Actions, observabilidad con Micrometer/CloudWatch/Grafana y ML operativo con SageMaker.
+## Overview
 
-## Características
+This platform provides financial transaction processing with real-time fraud detection capabilities. Built with a hexagonal architecture following Domain-Driven Design (DDD) principles, it's designed to be cloud-ready and observable.
 
-- **Arquitectura hexagonal**: puertos y adaptadores desacoplados.
-- **Backend robusto**: reglas de negocio realistas, scoring híbrido (60% ML + 40% reglas), umbrales dinámicos, validaciones robustas.
-- **Concurrencia**: Virtual Threads (Java 21) para alta capacidad de procesamiento.
-- **Infraestructura reproducible**: Terraform con módulos para VPC, ECS Fargate, Aurora, DynamoDB, SageMaker, SNS, IAM.
-- **CI/CD profesional**: GitHub Actions con build, test, Docker, ECR, Terraform y pruebas de integración.
-- **Observabilidad integrada**: métricas con Micrometer exportadas a CloudWatch, dashboard Grafana.
-- **MLOps**: pipeline de entrenamiento → validación → despliegue → monitoreo, con simulación de drift.
-- **Rama experimental**: Java 25 + Spring Boot 3.3.x para evaluación de última generación.
+## Architecture Overview
 
-## Estructura del proyecto
+The application follows a hexagonal architecture (ports and adapters) with clear separation of concerns:
 
+1. **Domain Layer**: Contains business logic, entities, value objects, and domain services
+   - Entities: `Transaction`, `FraudResult`
+   - Value Objects: `Money`, `CustomerId`
+   - Domain Services: `FraudDetectionService` (with extensible rules engine)
+
+2. **Application Layer**: Contains use cases (application services) and DTOs
+   - Use Cases: `RegisterTransaction`, `GetTransactionById`, `ListCustomerTransactions`, `GetFraudMetrics`
+   - DTOs for request/response validation and transformation
+
+3. **Infrastructure Layer**: Contains technical details and adapters
+   - REST Controllers exposing HTTP endpoints
+   - JPA Repositories for persistence
+   - Configuration classes (OpenTelemetry, exception handling)
+   - External adapters for databases, messaging, etc.
+
+## Technology Stack
+
+- **Language**: Java 21
+- **Framework**: Spring Boot 3.2.x
+- **Build Tool**: Maven
+- **Persistence**: JPA/Hibernate with PostgreSQL
+- **API Documentation**: OpenAPI 3.0 (SpringDoc) with Swagger UI
+- **Observability**: OpenTelemetry with OTLP export + Spring Boot Actuator
+- **Validation**: Jakarta Validation
+- **Dependency Injection**: Spring Framework
+- **Testing**: JUnit 5, Mockito, Testcontainers
+- **Containerization**: Docker (multi-stage build)
+- **Lombok**: For reducing boilerplate code
+
+## API Endpoints
+
+### Transaction Management
+
+#### Register a new transaction
 ```
-src/main/java           # Código fuente (dominio, aplicación, adaptadores, configuración)
-src/main/resources      # Configuración (application.properties, application-prod.properties)
-src/test                # Tests unitarios e integración
-Dockerfile              # Imagen Docker multi-stage
-docker-compose.yml      # Entorno local (PostgreSQL, Kafka, app)
-terraform/              # Infraestructura como código (AWS)
-.github/workflows/      # Pipelines CI/CD y ML
-docs/                   # Documentación, dashboards, diagramas
-scripts/                # Scripts auxiliares (bootstrap AWS, despliegue, modelo SageMaker)
-```
-
-## Prerrequisitos
-
-- Java 21 (rama estable) o Java 25 (rama experimental)
-- Maven 3.9+
-- Docker
-- AWS CLI configurado con credenciales
-- Terraform >= 1.5
-- PostgreSQL (desarrollo local)
-- Kafka (desarrollo local, opcional)
-
-## Ejecución local
-
-```bash
-# Compilar y ejecutar tests
-mvn clean verify
-
-# Ejecutar la aplicación
-java -jar target/finguard-0.0.1-SNAPSHOT.jar
-
-# La API estará disponible en http://localhost:8080
-```
-
-### Docker
-
-```bash
-docker build -t finguard .
-docker run -p 8080:8080 finguard
-```
-
-### Docker Compose (entorno completo local)
-
-```bash
-docker-compose up --build
-```
-
-Incluye PostgreSQL, Kafka y la aplicación FinGuard.
-
-## API
-
-### Evaluar transacción
-
-```http
-POST /api/v1/transactions/evaluate
+POST /api/transactions
 Content-Type: application/json
 
 {
-  "transactionId": "tx-123",
-  "customerId": "cust-456",
+  "customerId": "123e4567-e89b-12d3-a456-426614174000",
   "amount": 1500.00,
-  "merchantId": "merchant_high_risk",
-  "merchantCategoryCode": "7995",
-  "timestamp": "2026-07-28T14:30:00",
   "currency": "USD",
-  "paymentMethod": "card"
+  "timestamp": "2026-08-18T20:50:23",
+  "merchantCode": "5411"
 }
-```
 
-### Procesar evento de cliente
-
-```http
-POST /api/v1/transactions/customers/events
-Content-Type: application/json
-
+Response:
 {
-  "customerId": "cust-456",
-  "eventType": "login",
-  "eventData": { "device": "mobile" }
+  "transactionId": "123e4567-e89b-12d3-a456-426614174001",
+  "riskScore": 0.8,
+  "status": "REVIEW"
 }
 ```
 
-## Infraestructura
+#### Get transaction by ID
+```
+GET /api/transactions/{id}
 
-Ver [`terraform/README.md`](terraform/README.md) para el despliegue en AWS.
-
-### Bootstrap del estado remoto de Terraform
-
-Antes de aplicar módulos, crear el bucket S3 y la tabla DynamoDB para estado remoto y lock:
-
-```bash
-# Opción 1: manual desde AWS Console
-# - Crear bucket S3: finguard-terraform-state
-# - Crear tabla DynamoDB: finguard-terraform-locks (PK: LockID)
-
-# Opción 2: usando el módulo bootstrap (requiere AWS CLI configurado)
-cd scripts
-./setup_aws.ps1
+Response:
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "customerId": "123e4567-e89b-12d3-a456-426614174000",
+  "amount": 1500.00,
+  "currency": "USD",
+  "timestamp": "2026-08-18T20:50:23",
+  "merchantCode": "5411"
+}
 ```
 
-### Despliegue por ambientes
+#### List customer transactions
+```
+GET /api/customers/{customerId}/transactions
 
-```bash
-# Dev
-terraform init -backend-config=terraform/backend-dev.hcl
-terraform plan -var-file=terraform/terraform.tfvars
-terraform apply -var-file=terraform/terraform.tfvars
-
-# Staging
-terraform init -backend-config=terraform/backend-staging.hcl
-terraform plan -var-file=terraform/terraform.tfvars
-terraform apply -var-file=terraform/terraform.tfvars
-
-# Prod (con aprobación manual en GitHub Actions)
-terraform init -backend-config=terraform/backend-prod.hcl
-terraform plan -var-file=terraform/terraform.tfvars
-terraform apply -var-file=terraform/terraform.tfvars
+Response:
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "customerId": "123e4567-e89b-12d3-a456-426614174000",
+    "amount": 1500.00,
+    "currency": "USD",
+    "timestamp": "2026-08-18T20:50:23",
+    "merchantCode": "5411"
+  }
+]
 ```
 
-## CI/CD
+### Fraud Metrics
 
-- **Pipeline principal**: `.github/workflows/ci.yml`
-  - Build y test con Maven.
-  - Build y push de imagen Docker a ECR.
-  - Terraform init/plan/apply.
-  - Pruebas de integración post-despliegue.
-- **Pipeline de reentrenamiento**: `.github/workflows/ml-retrain.yml`
-  - Ejecución semanal o manual.
-  - Entrena, valida y despliega nuevo modelo en SageMaker.
-  - Notificaciones por SNS.
+#### Get fraud metrics
+```
+GET /api/metrics/fraud
 
-### Secrets requeridos en GitHub Actions
-
-Configurar en el repositorio → Settings → Secrets and variables → Actions:
-
-| Nombre | Descripción |
-|--------|-------------|
-| `AWS_ACCESS_KEY_ID` | Credenciales AWS con permisos para ECR, Terraform, SageMaker, SNS, DynamoDB |
-| `AWS_SECRET_ACCESS_KEY` | Credenciales AWS |
-| `ECR_REPOSITORY` | Nombre del repositorio ECR (ej: `finguard`) |
-
-Adicionalmente, crear el bucket S3 `finguard-terraform-state` y la tabla DynamoDB `finguard-terraform-locks` antes del primer deploy.
-
-## Observabilidad
-
-- **Métricas**: `/actuator/prometheus` (Prometheus) y exportación a CloudWatch.
-- **Dashboard Grafana**: importar `docs/grafana-dashboard.json`.
-- **Paneles**:
-  - Latency breakdown (p50, p95, p99)
-  - Fraud rate por merchant
-  - Drift del modelo
-  - Evaluaciones totales vs fraudes detectados
-  - Errores de evaluación
-
-## Machine Learning
-
-Ver [`docs/ml.md`](docs/ml.md) para detalles del pipeline.
-
-## Profiles de Spring Boot
-
-| Perfil | Uso |
-|--------|-----|
-| `default` / local | Desarrollo local con PostgreSQL local |
-| `prod` | AWS: Secrets Manager, CloudWatch, variables de entorno |
-| `test` | Tests unitarios e integración con H2 en memoria |
-
-## Seguridad
-
-- **AWS Secrets Manager**: en perfil `prod`, `SecretsManagerConfig` carga secretos automáticamente.
-- **IAM mínimo privilegio**: roles separados para ECS, SageMaker y acceso a recursos.
-- **Terraform remote state**: S3 + DynamoDB para lock y cifrado.
-
-## Branch experimental
-
-Ver [`docs/java25-experimental.md`](docs/java25-experimental.md) para instrucciones sobre la rama `java-25-spring-3.3`.
-
-## Comandos útiles
-
-```bash
-# Compilar
-mvn clean verify
-
-# Ejecutar local
-java -jar target/finguard-0.0.1-SNAPSHOT.jar
-
-# Docker
-docker build -t finguard .
-docker-compose up --build
-
-# Terraform
-terraform init -backend-config=terraform/backend-dev.hcl
-terraform plan -var-file=terraform/terraform.tfvars
-terraform apply -var-file=terraform/terraform.tfvars
-
-# Pipeline ML
-aws sagemaker wait endpoint-in-service --endpoint-name finguard-prod-endpoint
+Response:
+{
+  "totalTransactions": 100,
+  "approvedTransactions": 80,
+  "reviewTransactions": 20,
+  "averageRiskScore": 0.25
+}
 ```
 
-## Licencia
+## Observability
 
-MIT
+### Actuator Endpoints
+- `GET /actuator/health` - Application health status
+- `GET /actuator/metrics` - Application metrics (requires Prometheus or similar)
+- `GET /actuator/info` - Application information
+
+### OpenTelemetry
+Traces are exported via OTLP to the endpoint specified in the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable.
+By default, traces are sent to `localhost:4317` (common for Jaeger, Zipkin, or Azure Monitor).
+
+## Deployment Instructions
+
+### Local Deployment
+
+#### Prerequisites
+- Java JDK 21
+- Maven 3.8+
+- Docker (optional, for containerized deployment)
+- PostgreSQL (for persistence)
+
+#### Steps
+1. Clone the repository
+2. Configure database connection in `application.properties` or via environment variables
+3. Run the application:
+   ```bash
+   mvn spring-boot:run
+   ```
+   Or run the JAR directly:
+   ```bash
+   java -jar target/observability-platform-1.0.0-SNAPSHOT.jar
+   ```
+
+#### API Documentation
+Once running, access Swagger UI at:
+- http://localhost:8080/swagger-ui.html
+- http://localhost:8080/v3/api-docs (OpenAPI JSON)
+
+### Containerized Deployment
+
+#### Build the Docker image
+```bash
+docker build -t ai-fintech-observability-platform .
+```
+
+#### Run the container
+```bash
+docker run -p 8080:8080 \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/observability \
+  -e SPRING_DATASOURCE_USERNAME=postgres \
+  -e SPRING_DATASOURCE_PASSWORD=postgres \
+  -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
+  ai-fintech-observability-platform
+```
+
+### Cloud Deployment (Azure/AWS)
+
+#### Environment Variables
+Configure these environment variables for cloud deployment:
+
+```
+# Database Configuration
+SPRING_DATASOURCE_URL=jdbc:postgresql://[HOST]:[PORT]/[DATABASE]
+SPRING_DATASOURCE_USERNAME=[USERNAME]
+SPRING_DATASOURCE_PASSWORD=[PASSWORD]
+
+# OpenTelemetry Configuration
+OTEL_EXPORTER_OTLP_ENDPOINT=[OTLP_ENDPOINT]  # e.g., for Azure Monitor: https://[REGION].monitor.azure.com
+
+# Application Configuration
+SERVER_PORT=8080
+SPRING_PROFILES_ACTIVE=prod
+
+# Optional: Azure Key Vault / AWS Secrets Manager integration
+# (Implementation would require additional dependencies and configuration)
+```
+
+#### Azure Deployment Options
+1. **Azure App Service**: Deploy the Docker container to App Service
+2. **Azure Container Apps**: Deploy to serverless container platform
+3. **Azure Kubernetes Service (AKS)**: Deploy to managed Kubernetes
+
+#### AWS Deployment Options
+1. **AWS ECS/EKS**: Deploy container to managed container service
+2. **AWS Elastic Beanstalk**: Deploy to PaaS offering
+3. **AWS Lambda (container image)**: Deploy as container function
+
+## Health Check Endpoints
+
+The application provides several health check endpoints for monitoring:
+
+- `GET /actuator/health` - Overall application health
+- `GET /actuator/health/liveness` - Liveness probe (Kubernetes)
+- `GET /actuator/health/readiness` - Readiness probe (Kubernetes)
+- `GET /api/metrics/health` - Custom application health check (returns simple JSON)
+
+## Fraud Detection Logic
+
+The platform implements a placeholder fraud detection service with the following rules:
+
+1. **High Amount Rule**: If transaction amount > 1000 USD → riskScore = 0.8, status = REVIEW
+2. **Business Hours Rule**: If transaction occurs outside business hours (9:00-18:00 local time) → riskScore = 0.8, status = REVIEW
+3. **Default**: Otherwise → riskScore = 0.2, status = APPROVED
+
+The `FraudDetectionService` interface is designed to allow easy injection of ML models in the future by replacing the implementation.
+
+## Testing
+
+### Unit Tests
+Run unit tests with:
+```bash
+mvn test
+```
+
+### Integration Tests
+Integration tests use Testcontainers to spin up a real PostgreSQL instance:
+```bash
+mvn verify
+```
+
+## Configuration
+
+### application.properties
+```properties
+# Server
+server.port=${PORT:8080}
+
+# Database
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/observability}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:postgres}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:postgres}
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+
+# OpenTelemetry
+management.endpoints.web.exposure.include=health,info,metrics
+management.endpoint.health.show-details=always
+
+# Application
+spring.profiles.active=${SPRING_PROFILES_ACTIVE:dev}
+```
+
+## License
+
+This project is licensed under the MIT License.

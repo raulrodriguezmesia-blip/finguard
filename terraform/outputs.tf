@@ -1,35 +1,51 @@
-output "alb_dns_name" {
-  description = "DNS name del Application Load Balancer"
-  value       = module.ecs_fargate.alb_dns_name
+output "resource_group_name" {
+  description = "Nombre del resource group principal"
+  value       = local.bootstrap_rg_name
 }
 
-output "ecs_cluster_name" {
-  description = "Nombre del cluster ECS"
-  value       = module.ecs_fargate.ecs_cluster_name
+output "aks_cluster_name" {
+  description = "Nombre del cluster AKS"
+  value       = module.aks.aks_cluster_name
 }
 
-output "aurora_endpoint" {
-  description = "Endpoint de Aurora PostgreSQL"
-  value       = module.aurora.aurora_endpoint
+output "aks_cluster_fqdn" {
+  description = "FQDN del API server de AKS"
+  value       = module.aks.aks_cluster_fqdn
+}
+
+output "aks_kubeconfig" {
+  description = "Comando para obtener kubeconfig"
+  value       = "az aks get-credentials --resource-group ${local.bootstrap_rg_name} --name ${module.aks.aks_cluster_name}"
   sensitive   = true
 }
 
-output "feature_store_table" {
-  description = "Nombre de la tabla DynamoDB de feature store"
-  value       = module.dynamodb.feature_store_table_name
+output "acr_login_server" {
+  description = "Login server de ACR"
+  value       = module.acr.acr_login_server
 }
 
-output "sagemaker_endpoint" {
-  description = "Nombre del endpoint de SageMaker"
-  value       = try(module.sagemaker[0].sagemaker_endpoint_name, "")
+output "acr_id" {
+  description = "ID del recurso ACR"
+  value       = module.acr.acr_id
 }
 
-output "sagemaker_endpoint_arn" {
-  description = "ARN del endpoint de SageMaker"
-  value       = try(module.sagemaker[0].sagemaker_endpoint_arn, "")
+output "key_vault_uri" {
+  description = "URI de Key Vault"
+  value       = module.key_vault.key_vault_uri
 }
 
-output "alert_topic_arn" {
-  description = "ARN del topic SNS para alertas"
-  value       = module.sns.alert_topic_arn
+output "log_analytics_workspace_id" {
+  description = "ID del workspace de Log Analytics"
+  value       = module.log_analytics.workspace_id
+}
+
+output "application_insights_connection_string" {
+  description = "Connection string de Application Insights"
+  value       = module.application_insights.connection_string
+  sensitive   = true
+}
+
+output "vnet_id" {
+  description = "ID de la VNet"
+  value       = module.vnet.vnet_id
 }

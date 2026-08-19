@@ -1,97 +1,100 @@
-terraform {
-  required_version = ">= 1.5"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
+locals {
+  name_prefix = "${var.project_name}-${var.environment}"
+  common_tags = merge(var.tags, {
+    environment = var.environment
+  })
 }
 
-provider "aws" {
-  region = var.aws_region
+# Bootstrap module: creates the resource group and storage account for Terraform state.
+# The storage account (finguardtfstate) already exists in rg-finguard-terraform-state
+# and was imported into state. We point the module at that existing storage RG.
+module "bootstrap" {
+  source = "./modules/bootstrap"
+
+  location            = var.location
+  project_name        = var.project_name
+  environment         = var.environment
+  resource_group_name = "rg-finguard-terraform-state"
+  tags                = local.common_tags
 }
 
 locals {
-  name_prefix = "${var.project_name}-${var.environment}"
+  bootstrap_rg_name = "rg-finguard-${var.environment}"
+  tfstate_sa_name   = module.bootstrap.storage_account_name
 }
 
-module "vpc" {
-  source = "./modules/vpc"
+module "vnet" {
+  source = "./modules/vnet"
 
-  name_prefix        = local.name_prefix
-  vpc_cidr           = var.vpc_cidr
-  availability_zones = var.availability_zones
-  public_subnets     = var.public_subnets
-  private_subnets    = var.private_subnets
-  environment        = var.environment
-}
-
-module "iam" {
-  source = "./modules/iam"
-
-  name_prefix        = local.name_prefix
-  environment        = var.environment
-}
-
-module "sns" {
-  source = "./modules/sns"
-
-  name_prefix = local.name_prefix
-  environment = var.environment
-}
-
-module "dynamodb" {
-  source = "./modules/dynamodb"
-
-  name_prefix   = local.name_prefix
-  environment   = var.environment
-  billing_mode  = "PAY_PER_REQUEST"
-}
-
-module "aurora" {
-  source = "./modules/aurora"
-
-  name_prefix         = local.name_prefix
+  location            = var.location
+  project_name        = var.project_name
   environment         = var.environment
-  vpc_id              = module.vpc.vpc_id
-  private_subnet_ids  = module.vpc.private_subnet_ids
-  db_username         = var.db_username
-  db_password         = var.db_password
-  db_instance_class   = var.environment == "prod" ? "db.t3.medium" : "db.t3.micro"
-  db_instance_count   = var.environment == "prod" ? 2 : 1
-  skip_final_snapshot = var.environment != "prod"
+  resource_group_name = local.bootstrap_rg_name
+  tags                = local.common_tags
 }
 
-module "ecs_fargate" {
-  source = "./modules/ecs_fargate"
+module "log_analytics" {
+  source = "./modules/log_analytics"
 
-  name_prefix          = local.name_prefix
-  environment          = var.environment
-  vpc_id               = module.vpc.vpc_id
-  public_subnet_ids    = module.vpc.public_subnet_ids
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  alb_security_group_id = module.vpc.alb_security_group_id
-  ecs_security_group_id = module.vpc.ecs_security_group_id
-  task_execution_role_arn = module.iam.ecs_task_execution_role_arn
-  task_role_arn        = module.iam.ecs_task_role_arn
-  container_image      = var.container_image
-  container_port       = 8080
-  desired_count        = var.desired_count
-  cpu                  = 256
-  memory               = 512
-  sns_topic_arn        = module.sns.alert_topic_arn
-  secrets_manager_arn  = var.environment == "prod" ? var.secrets_manager_arn : ""
+  location            = var.location
+  project_name        = var.project_name
+  environment         = var.environment
+  resource_group_name = local.bootstrap_rg_name
+  retention_days      = var.log_analytics_retention_days
+  tags                = local.common_tags
 }
 
-module "sagemaker" {
-  count        = var.environment == "prod" ? 1 : 0
-  source       = "./modules/sagemaker"
+module "key_vault" {
+  source = "./modules/key_vault"
 
-  name_prefix   = local.name_prefix
-  environment   = var.environment
-  role_arn      = module.iam.sagemaker_role_arn
-  instance_type = "ml.t2.medium"
-  s3_bucket     = var.sagemaker_s3_bucket
+  location            = var.location
+  project_name        = var.project_name
+  environment         = var.environment
+  resource_group_name = local.bootstrap_rg_name
+  tags                = local.common_tags
+  sku_name            = var.key_vault_sku
+  jwt_secret          = var.jwt_secret
+}
+
+module "acr" {
+  source = "./modules/acr"
+
+  location            = var.location
+  project_name        = var.project_name
+  environment         = var.environment
+  resource_group_name = local.bootstrap_rg_name
+  tags                = local.common_tags
+  sku                 = var.acr_sku
+}
+
+module "aks" {
+  source = "./modules/aks"
+
+  location                    = var.location
+  project_name                = var.project_name
+  environment                 = var.environment
+  resource_group_name         = local.bootstrap_rg_name
+  tags                        = local.common_tags
+  kubernetes_version          = "1.36.2"
+  node_pool_vm_size           = var.node_pool_vm_size
+  node_pool_min_count         = var.node_pool_min_count
+  node_pool_max_count         = var.node_pool_max_count
+  node_pool_os_disk_size_gb   = var.node_pool_os_disk_size_gb
+  vnet_id                     = module.vnet.vnet_id
+  aks_subnet_id               = module.vnet.aks_subnet_id
+  acr_id                      = module.acr.acr_id
+  log_analytics_workspace_id  = module.log_analytics.workspace_id
+  log_analytics_workspace_key = module.log_analytics.workspace_key
+  key_vault_id                = module.key_vault.key_vault_id
+}
+
+module "application_insights" {
+  source = "./modules/application_insights"
+
+  location            = var.location
+  project_name        = var.project_name
+  environment         = var.environment
+  resource_group_name = local.bootstrap_rg_name
+  tags                = local.common_tags
+  workspace_id        = module.log_analytics.workspace_resource_id
 }

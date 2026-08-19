@@ -1,67 +1,40 @@
-variable "name_prefix" {
-  type = string
+resource "azurerm_resource_group" "main" {
+  name     = "rg-${var.project_name}-${var.environment}"
+  location = var.location
+  tags     = var.tags
 }
 
-variable "project_name" {
-  type = string
-}
+resource "azurerm_storage_account" "tfstate" {
+  name                     = replace("${var.project_name}tfstate", "-", "")
+  resource_group_name      = var.resource_group_name
+  location                 = var.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  min_tls_version          = "TLS1_2"
+  tags                     = var.tags
 
-variable "environment" {
-  type    = string
-  default = "prod"
-}
-
-variable "aws_region" {
-  type    = string
-  default = "us-east-1"
-}
-
-resource "aws_s3_bucket" "terraform_state" {
-  bucket = "${var.project_name}-terraform-state"
-
-  tags = {
-    Name        = "${var.project_name}-terraform-state"
-    Environment = var.environment
-  }
-}
-
-resource "aws_s3_bucket_versioning" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+  blob_properties {
+    delete_retention_policy {
+      days = 30
+    }
+    container_delete_retention_policy {
+      days = 30
     }
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
+# Container "tfstate" and table "terraformlocks" already exist in the
+# storage account and are managed externally by the Terraform backend.
+# They are intentionally NOT managed here to avoid create-conflicts.
+# If bootstrapping from scratch, uncomment the two blocks below.
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
+# resource "azurerm_storage_container" "tfstate" {
+#   name                  = "tfstate"
+#   storage_account_name  = azurerm_storage_account.tfstate.name
+#   container_access_type = "private"
+# }
 
-resource "aws_dynamodb_table" "terraform_locks" {
-  name         = "${var.project_name}-terraform-locks"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-
-  tags = {
-    Name        = "${var.project_name}-terraform-locks"
-    Environment = var.environment
-  }
-}
+# resource "azurerm_storage_table" "locks" {
+#   name                 = "terraformlocks"
+#   storage_account_name = azurerm_storage_account.tfstate.name
+# }

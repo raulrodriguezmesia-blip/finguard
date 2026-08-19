@@ -7,72 +7,97 @@ variable "project_name" {
 variable "environment" {
   description = "Ambiente (dev, staging, prod)"
   type        = string
-  default     = "prod"
+  default     = "dev"
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "El ambiente debe ser dev, staging o prod."
+  }
 }
 
-variable "aws_region" {
-  description = "Región de AWS"
+variable "location" {
+  description = "Región de Azure"
   type        = string
-  default     = "us-east-1"
+  default     = "eastus"
 }
 
-variable "vpc_cidr" {
-  description = "CIDR block para la VPC"
+variable "tags" {
+  description = "Tags globales"
+  type        = map(string)
+  default = {
+    project     = "finguard"
+    managed-by  = "terraform"
+    environment = "dev"
+  }
+}
+
+variable "node_pool_vm_size" {
+  description = "Tamaño de VM para node pool de usuario"
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "Standard_D2s_v3"
 }
 
-variable "availability_zones" {
-  description = "AZs disponibles en la región"
-  type        = list(string)
-  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+variable "node_pool_min_count" {
+  description = "Cantidad mínima de nodos en el pool de usuario"
+  type        = number
+  default     = 1
 }
 
-variable "public_subnets" {
-  description = "CIDR blocks para subnets públicas"
-  type        = list(string)
-  default     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+variable "node_pool_max_count" {
+  description = "Cantidad máxima de nodos en el pool de usuario"
+  type        = number
+  default     = 5
 }
 
-variable "private_subnets" {
-  description = "CIDR blocks para subnets privadas"
-  type        = list(string)
-  default     = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
+variable "node_pool_os_disk_size_gb" {
+  description = "Tamaño de disco OS de nodos"
+  type        = number
+  default     = 128
 }
 
-variable "db_username" {
-  description = "Usuario de la base de datos"
+variable "acr_sku" {
+  description = "SKU de ACR"
   type        = string
-  default     = "finguard"
+  default     = "Standard"
+  validation {
+    condition     = contains(["Basic", "Standard", "Premium"], var.acr_sku)
+    error_message = "El SKU de ACR debe ser Basic, Standard o Premium."
+  }
 }
 
-variable "db_password" {
-  description = "Contraseña de la base de datos"
+variable "log_analytics_retention_days" {
+  description = "Días de retención de logs en Log Analytics"
+  type        = number
+  default     = 30
+}
+
+variable "key_vault_sku" {
+  description = "SKU de Key Vault"
+  type        = string
+  default     = "standard"
+}
+
+variable "jwt_secret" {
+  description = "Secret para JWT (se almacena en Key Vault)"
   type        = string
   sensitive   = true
-  default     = "changeme" # Cambiar en producción
+  default     = "default-secret-key-change-me-in-production"
 }
 
-variable "container_image" {
-  description = "Imagen Docker del backend"
+variable "kafka_bootstrap_servers" {
+  description = "Bootstrap servers de Kafka (para configurar app)"
   type        = string
-  default     = "public.ecr.aws/aws/amazon-linux:latest" # Placeholder
+  default     = ""
 }
 
-variable "desired_count" {
-  description = "Número de tareas ECS deseadas"
-  type        = number
-  default     = 2
-}
-
-variable "sagemaker_s3_bucket" {
-  description = "Bucket S3 para artefactos de SageMaker"
+variable "kafka_username" {
+  description = "Usuario SASL para Kafka"
   type        = string
-  default     = "finguard-sagemaker-artifacts"
+  default     = ""
 }
 
-variable "secrets_manager_arn" {
-  description = "ARN del secreto de base de datos en AWS Secrets Manager"
+variable "kafka_password" {
+  description = "Password SASL para Kafka"
   type        = string
+  sensitive   = true
   default     = ""
 }
