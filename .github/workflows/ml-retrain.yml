@@ -62,7 +62,7 @@ jobs:
 
           aws sagemaker update-endpoint \
             --endpoint-name ${{ env.SAGEMAKER_ENDPOINT }} \
-            --endpoint-config-name ${MODEL_NAME}-config-${TIMESTAMP}}
+            --endpoint-config-name ${MODEL_NAME}-config-${TIMESTAMP}
 
       - name: Wait for endpoint deployment
         run: |

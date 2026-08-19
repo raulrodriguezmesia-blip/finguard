@@ -103,3 +103,36 @@ jobs:
           IMAGE_TAG=${{ github.sha }}
           docker tag fintech-platform:latest ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:$IMAGE_TAG
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:$IMAGE_TAG
+
+  deploy-aks:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set KUBECONFIG for AKS
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: rg-finguard-dev
+          cluster-name: aks-finguard-dev
+          admin-client-id: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+
+      - name: Deploy manifests to AKS
+        run: |
+          # Update deployment with correct ACR image tag
+          sed -i "s|:1.0.0|:${IMAGE_TAG}|g" ./k8s/finguard-deployment.yaml
+          kubectl apply -f ./k8s/finguard-configmap.yaml
+          kubectl apply -f ./k8s/finguard-deployment.yaml
+          kubectl apply -f ./k8s/finguard-secrets.yaml
+          kubectl apply -f ./k8s/finguard-service.yaml
+          kubectl apply -f ./k8s/finguard-hpa.yaml
+
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/finguard-app --timeout=120s
+
+      - name: Show deployed pods
+        run: kubectl get pods -l app=finguard-app
