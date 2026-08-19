@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: finguard-app-service
+  namespace: default
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+    service.beta.kubernetes.io/azure-dns-label-name: "finguard-app-dev"
+spec:
+  selector:
+    app: finguard-app
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP

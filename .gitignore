@@ -117,3 +117,19 @@ docker-compose.override.yml
 
 # AWS CLI
 .aws/
+# Azure CLI
+.azure/cli/
+
+# Windows User Profile - Prevent accidental commit of local paths
+AppData/
+AppData/*
+**/.DS_Store
+**/Thumbs.db
+
+# Local credentials and tokens
+*.pem
+*.cert
+*.key
+~/.ssh
+~/.kube
+~/.azure

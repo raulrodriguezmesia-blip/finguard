@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finguard-config
+  namespace: default
+data:
+  # Database Configuration
+  DB_HOST: "postgres.postgres-svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "fintech"
+  
+  # Application Configuration
+  SERVER_PORT: "8080"
+  
+  # OpenTelemetry Configuration
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  OTEL_SERVICE_NAME: "finguard-app"
+  OTEL_TRACES_SAMPLER: "parentbased_always_on"
+  
+  # Logging
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_AI_FINTECH: "DEBUG"
+  
+  # Cloud Environment
+  CLOUD_ENV: "azure"

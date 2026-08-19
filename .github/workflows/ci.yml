@@ -1,145 +1,105 @@
-name: FinGuard CI/CD
+name: CI/CD - Fintech Platform
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Environment to deploy"
-        required: true
-        default: "dev"
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
-
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: finguard
+    branches: [ main ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      # Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for tags and branches
 
-      - name: Set up JDK 21
+      # Set up Java 21 (Temurin)
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: 21
           cache: maven
 
-      - name: Build and test with Maven
-        run: mvn clean verify -B -DskipTests=false
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
+      # Cache Maven dependencies
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
         with:
-          name: test-results
-          path: target/surefire-reports/
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
 
-  docker:
+      # Validate pom.xml (fails fast on XML errors)
+      - name: Validate pom.xml
+        run: mvn validate -B
+
+      # Run full test suite (unit + integration tests)
+      - name: Run tests
+        run: mvn verify -B
+
+      # Upload test reports as artifacts
+      - name: Upload test reports
+        if: always()  # Always run to collect test results even if tests fail
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: 
+            - **/target/surefire-reports/
+            - **/target/failsafe-reports/
+          retention-days: 7
+
+      # Upload JAR file as artifact
+      - name: Upload JAR artifact
+        if: success()  # Only upload if build succeeds
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-jar
+          path: target/*.jar
+          retention-days: 30
+
+  docker-build:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      # Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          fetch-depth: 0
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      # Set up Java 21 (needed for Maven build)
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
 
-      - name: Build and push Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      # Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Build Docker image
+      - name: Build Docker image
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          docker build -t fintech-platform:latest .
+          docker tag fintech-platform:latest ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:latest
 
-  terraform:
-    needs: docker
-    runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      # Push Docker image to Docker Hub
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:latest
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.5.0"
-
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init -backend-config=backend-${{ github.event.inputs.environment || 'dev' }}.hcl
-
-      - name: Terraform Plan
-        id: plan
-        working-directory: terraform
+      # Optional: Also push with git SHA for traceability
+      - name: Push Docker image with SHA
+        if: github.event_name == 'push'
         run: |
-          terraform plan -var="container_image=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" -out=tfplan
-
-      - name: Terraform Apply
-        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-        working-directory: terraform
-        run: terraform apply -auto-approve tfplan
-
-      - name: Capture Terraform Outputs
-        id: outputs
-        working-directory: terraform
-        run: |
-          terraform output -json > terraform-outputs.json
-          echo "alb_dns=$(jq -r '.alb_dns_name.value' terraform-outputs.json)" >> $GITHUB_OUTPUT
-          echo "aurora_endpoint=$(jq -r '.aurora_endpoint.value' terraform-outputs.json)" >> $GITHUB_OUTPUT
-
-      - name: Upload Terraform Outputs
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-outputs
-          path: terraform/terraform-outputs.json
-          retention-days: 7
-
-  integration-tests:
-    needs: terraform
-    runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
-    steps:
-      - name: Download Terraform Outputs
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-outputs
-          path: .
-
-      - name: Run integration tests
-        env:
-          BASE_URL: ${{ needs.terraform.outputs.alb_dns }}
-        run: |
-          echo "Running integration tests against $BASE_URL"
-          curl -f http://$BASE_URL/actuator/health || exit 1
-          curl -f http://$BASE_URL/api/v1/transactions/evaluate \
-            -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"transactionId":"test-1","customerId":"cust-1","amount":100,"merchantId":"m1","merchantCategoryCode":"1234","timestamp":"2026-07-28T00:00:00","currency":"USD","paymentMethod":"card"}' || exit 1
+          IMAGE_TAG=${{ github.sha }}
+          docker tag fintech-platform:latest ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:$IMAGE_TAG
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:$IMAGE_TAG
