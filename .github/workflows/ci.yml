@@ -79,30 +79,36 @@ jobs:
           java-version: 21
           cache: maven
 
-      # Log in to Docker Hub
-      - name: Log in to Docker Hub
+      # Log in to Azure Container Registry
+      - name: Log in to Azure Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: finguarddevacr.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      # Set image tag for traceability
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
 
       # Build Docker image
       - name: Build Docker image
         run: |
-          docker build -t fintech-platform:latest .
-          docker tag fintech-platform:latest ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:latest
+          docker build -t finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} .
+          docker tag finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} finguarddevacr.azurecr.io/finguard-app:latest
 
-      # Push Docker image to Docker Hub
+      # Push Docker image to ACR
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:latest
+        run: docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
 
-      # Optional: Also push with git SHA for traceability
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+
+      # Push Docker image with SHA for traceability
       - name: Push Docker image with SHA
         if: github.event_name == 'push'
         run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker tag fintech-platform:latest ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:$IMAGE_TAG
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/fintech-platform:$IMAGE_TAG
+          docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
 
   deploy-aks:
     needs: docker-build
