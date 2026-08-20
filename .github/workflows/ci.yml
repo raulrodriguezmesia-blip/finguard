@@ -94,15 +94,16 @@ jobs:
       # Build Docker image
       - name: Build Docker image
         run: |
-          docker build -t finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} .
-          docker tag finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} finguarddevacr.azurecr.io/finguard-app:latest
+          docker build -t finguarddevacr.azurecr.io/finguard-app:${{ github.sha }} .
+          docker tag finguarddevacr.azurecr.io/finguard-app:${{ github.sha }} finguarddevacr.azurecr.io/finguard-app:latest
+          docker tag finguarddevacr.azurecr.io/finguard-app:${{ github.sha }} finguarddevacr.azurecr.io/finguard-app:1.0.0
 
       # Push Docker image to ACR
       - name: Push Docker image
-        run: docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
-
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+        run: |
+          docker push finguarddevacr.azurecr.io/finguard-app:${{ github.sha }}
+          docker push finguarddevacr.azurecr.io/finguard-app:latest
+          docker push finguarddevacr.azurecr.io/finguard-app:1.0.0
 
       # Push Docker image with SHA for traceability
       - name: Push Docker image with SHA
