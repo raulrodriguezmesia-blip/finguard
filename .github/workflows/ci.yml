@@ -10,11 +10,13 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
+      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Needed for tags and branches
 
+      # Set up Java 21 (Temurin)
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -22,6 +24,7 @@ jobs:
           java-version: 21
           cache: maven
 
+      # Cache Maven dependencies
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
@@ -30,24 +33,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      # Validate pom.xml (fails fast on XML errors)
       - name: Validate pom.xml
         run: mvn validate -B
 
+      # Run full test suite (unit + integration tests)
       - name: Run tests
         run: mvn verify -B
 
+      # Upload test reports as artifacts
       - name: Upload test reports
-        if: always()
+        if: always()  # Always run to collect test results even if tests fail
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: |
-            **/target/surefire-reports/
-            **/target/failsafe-reports/
+          path:
+            - "**/target/surefire-reports/"
+            - "**/target/failsafe-reports/"
           retention-days: 7
 
+      # Upload JAR file as artifact
       - name: Upload JAR artifact
-        if: success()
+        if: success()  # Only upload if build succeeds
         uses: actions/upload-artifact@v4
         with:
           name: application-jar
@@ -58,11 +65,13 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
+      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Set up Java 21 (needed for Maven build)
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -70,24 +79,36 @@ jobs:
           java-version: 21
           cache: maven
 
-      # Login to Azure Container Registry
-      - name: Login to Azure Container Registry
-        uses: azure/docker-login@v1
+      # Log in to Azure Container Registry
+      - name: Log in to Azure Container Registry
+        uses: docker/login-action@v3
         with:
-          login-server: finguarddevacr.azurecr.io
+          registry: finguarddevacr.azurecr.io
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      # Build and push Docker image con SHA y latest
-      - name: Build and push Docker image
+      # Set image tag for traceability
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+
+      # Build Docker image
+      - name: Build Docker image
         run: |
-          IMAGE_TAG=${{ github.sha }}
           docker build -t finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} .
-          docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
           docker tag finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} finguarddevacr.azurecr.io/finguard-app:latest
-          docker push finguarddevacr.azurecr.io/finguard-app:latest
-          docker tag finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} finguarddevacr.azurecr.io/finguard-app:1.0.0
-          docker push finguarddevacr.azurecr.io/finguard-app:1.0.0
+
+      # Push Docker image to ACR
+      - name: Push Docker image
+        run: docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+
+      # Push Docker image with SHA for traceability
+      - name: Push Docker image with SHA
+        if: github.event_name == 'push'
+        run: |
+          docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
 
   deploy-aks:
     needs: docker-build
@@ -101,13 +122,15 @@ jobs:
         with:
           resource-group: rg-finguard-dev
           cluster-name: aks-finguard-dev
-          credentials: ${{ secrets.AZURE_CREDENTIALS }}
+          admin-client-id: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Set image tag
         run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Deploy manifests to AKS
         run: |
+          # Update deployment with correct ACR image tag
+          sed -i "s|:1.0.0|:${IMAGE_TAG}|g" ./k8s/finguard-deployment.yaml
           kubectl apply -f ./k8s/finguard-configmap.yaml
           kubectl apply -f ./k8s/finguard-deployment.yaml
           kubectl apply -f ./k8s/finguard-secrets.yaml
