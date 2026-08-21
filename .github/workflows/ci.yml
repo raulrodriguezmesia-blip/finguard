@@ -129,6 +129,7 @@ jobs:
           kubectl apply -f ./k8s/finguard-service.yaml
           kubectl apply -f ./k8s/finguard-hpa.yaml
 
+
       - name: Wait for rollout
         run: kubectl rollout status deployment/finguard-app --timeout=120s
 
