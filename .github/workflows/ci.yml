@@ -1,4 +1,4 @@
-name: CI/CD - Plataforma Fintech
+name: CI/CD - Fintech Platform
 
 on:
   push:
@@ -10,21 +10,18 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Needed for tags and branches
+          fetch-depth: 0
 
-      # Setup Java 21 (Temurin)
-      - name: Setup Java 21
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: maven
 
-      # Cache Maven dependencies
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
@@ -33,15 +30,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      # Validate pom.xml
       - name: Validate pom.xml
         run: mvn validate -B
 
-      # Run tests (unit + integration)
       - name: Run tests
         run: mvn verify -B
 
-      # Upload test reports
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -52,7 +46,6 @@ jobs:
             **/target/failsafe-reports/
           retention-days: 7
 
-      # Upload JAR artifact
       - name: Upload JAR artifact
         if: success()
         uses: actions/upload-artifact@v4
@@ -70,38 +63,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Java 21
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: maven
 
+      # Login to Azure Container Registry
       - name: Login to Azure Container Registry
-        uses: docker/login-action@v3
+        uses: azure/docker-login@v1
         with:
-          registry: finguarddevacr.azurecr.io
+          login-server: finguarddevacr.azurecr.io
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
-
-      - name: Build Docker image
+      # Build and push Docker image con SHA y latest
+      - name: Build and push Docker image
         run: |
-          docker build -t finguarddevacr.azurecr.io/finguard-app:${{ github.sha }} .
-          docker tag finguarddevacr.azurecr.io/finguard-app:${{ github.sha }} finguarddevacr.azurecr.io/finguard-app:latest
-          docker tag finguarddevacr.azurecr.io/finguard-app:${{ github.sha }} finguarddevacr.azurecr.io/finguard-app:1.0.0
-
-      - name: Push Docker image
-        run: |
-          docker push finguarddevacr.azurecr.io/finguard-app:${{ github.sha }}
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} .
+          docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
+          docker tag finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} finguarddevacr.azurecr.io/finguard-app:latest
           docker push finguarddevacr.azurecr.io/finguard-app:latest
+          docker tag finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} finguarddevacr.azurecr.io/finguard-app:1.0.0
           docker push finguarddevacr.azurecr.io/finguard-app:1.0.0
-
-      - name: Push Docker image with SHA
-        if: github.event_name == 'push'
-        run: docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
 
   deploy-aks:
     needs: docker-build
@@ -109,7 +95,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+        
       - name: Set KUBECONFIG for AKS
         uses: azure/aks-set-context@v4
         with:
@@ -122,7 +108,6 @@ jobs:
 
       - name: Deploy manifests to AKS
         run: |
-          sed -i "s|:1.0.0|:${IMAGE_TAG}|g" ./k8s/finguard-deployment.yaml
           kubectl apply -f ./k8s/finguard-configmap.yaml
           kubectl apply -f ./k8s/finguard-deployment.yaml
           kubectl apply -f ./k8s/finguard-secrets.yaml
