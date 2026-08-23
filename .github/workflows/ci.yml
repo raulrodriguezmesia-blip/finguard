@@ -58,7 +58,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: application-jar
-          path: target/*.jar
+          path: target/observability-platform-1.0.0-SNAPSHOT.jar
           retention-days: 30
 
   docker-build:

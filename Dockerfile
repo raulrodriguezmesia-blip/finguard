@@ -17,7 +17,7 @@ RUN mvn dependency:go-offline -B
 # Copy source code
 COPY src ./src
 
-# Build the application
+# Build the application (includes spring-boot repackage goal)
 RUN mvn clean package -DskipTests
 
 # Stage 2: Run with distroless JRE image
@@ -26,8 +26,9 @@ FROM gcr.io/distroless/java21-debian12
 # Set working directory
 WORKDIR /app
 
-# Copy the JAR from the build stage
-COPY --from=build /app/target/observability-platform-1.0.0-SNAPSHOT.jar ./app.jar
+# Copy the fat JAR from the build stage
+# Note: spring-boot-maven-plugin repackages to: *.jar (same name)
+COPY --from=build /app/target/observability-platform-1.0.0-SNAPSHOT.jar /app/app.jar
 
 # Expose port 8080
 EXPOSE 8080
