@@ -87,28 +87,19 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      # Set image tag for traceability
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
-
       # Build Docker image
       - name: Build Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} .
           docker tag finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} finguarddevacr.azurecr.io/finguard-app:latest
 
       # Push Docker image to ACR
       - name: Push Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
-
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
-
-      # Push Docker image with SHA for traceability
-      - name: Push Docker image with SHA
-        if: github.event_name == 'push'
-        run: |
-          docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
 
   deploy-aks:
     needs: docker-build
@@ -124,10 +115,9 @@ jobs:
           cluster-name: aks-finguard-dev
           admin-client-id: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
-
       - name: Deploy manifests to AKS
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           # Update deployment with correct ACR image tag
           sed -i "s|:1.0.0|:${IMAGE_TAG}|g" ./k8s/finguard-deployment.yaml
