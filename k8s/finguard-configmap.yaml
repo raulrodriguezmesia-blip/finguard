@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: finguard-config
-  namespace: default
+  namespace: finguard-ns
 data:
   # Database Configuration
   DB_HOST: "postgres.postgres-svc.cluster.local"

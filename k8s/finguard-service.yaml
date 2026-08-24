@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: finguard-app-service
-  namespace: default
+  namespace: finguard-ns
   annotations:
     service.beta.kubernetes.io/azure-load-balancer-internal: "false"
     service.beta.kubernetes.io/azure-dns-label-name: "finguard-app-dev"

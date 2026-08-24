@@ -2,7 +2,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: finguard-app-hpa
-  namespace: default
+  namespace: finguard-ns
   labels:
     app: finguard-app
 spec:
