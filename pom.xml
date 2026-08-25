@@ -23,18 +23,18 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Override ByteBuddy version for Hibernate 6.3.1 compatibility (MUST be before Spring Boot BOM) -->
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy</artifactId>
+                <version>1.14.11</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>3.2.0</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <!-- Override ByteBuddy version for Hibernate 6.3.1 compatibility -->
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy</artifactId>
-                <version>1.14.11</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
