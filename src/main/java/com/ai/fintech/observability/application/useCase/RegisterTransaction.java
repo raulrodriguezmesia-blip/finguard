@@ -11,7 +11,7 @@ import com.ai.fintech.observability.domain.model.FraudResult;
  * Caso de uso para registrar una nueva transacción y evaluarla para fraude.
  * Implementa el patrón Command de CQRS.
  */
-public class RegisterTransaction {
+@Service`npublic class RegisterTransaction {
     private final TransactionRepository transactionRepository;
     private final FraudDetectionService fraudDetectionService;
     private final FraudResultRepository fraudResultRepository;
