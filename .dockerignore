@@ -4,3 +4,9 @@ temp_project/**
 .gitignore
 .azure/
 target/
+
+terraform/
+
+**/logs/
+
+**/*.log
