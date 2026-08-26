@@ -8,6 +8,7 @@ import com.ai.fintech.observability.domain.service.FraudDetectionService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import org.springframework.stereotype.Service;
 
 /**
  * Implementación del servicio de detección de fraude con lógica placeholder.
