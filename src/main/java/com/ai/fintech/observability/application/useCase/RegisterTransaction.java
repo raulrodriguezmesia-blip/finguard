@@ -5,7 +5,7 @@ import com.ai.fintech.observability.application.port.FraudResultRepository;
 import com.ai.fintech.observability.domain.model.Transaction;
 import com.ai.fintech.observability.domain.model.FraudResult;
 import com.ai.fintech.observability.domain.service.FraudDetectionService;
-import com.ai.fintech.observability.domain.model.FraudResult;
+import org.springframework.stereotype.Service;
 
 /**
  * Caso de uso para registrar una nueva transacción y evaluarla para fraude.
