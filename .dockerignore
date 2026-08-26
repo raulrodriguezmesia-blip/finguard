@@ -1,0 +1,6 @@
+temp_project/**
+.kilo/**
+.git/
+.gitignore
+.azure/
+target/
