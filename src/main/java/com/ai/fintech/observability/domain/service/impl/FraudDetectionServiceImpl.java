@@ -13,6 +13,7 @@ import java.time.LocalTime;
  * Implementación del servicio de detección de fraude con lógica placeholder.
  * Implementa reglas básicas que pueden ser extendidas o reemplazadas por ML.
  */
+@Service
 public class FraudDetectionServiceImpl implements FraudDetectionService {
 
     // Umbral de cantidad para considerar transacción como de alto riesgo
