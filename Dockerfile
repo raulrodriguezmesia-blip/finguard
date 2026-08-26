@@ -2,13 +2,10 @@
 # Multi-stage build: Maven/Temurin JDK 21 -> Distroless JRE
 
 # Stage 1: Build with Maven and Temurin JDK 21
-FROM eclipse-temurin:21-jdk AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 
 # Set working directory
 WORKDIR /app
-
-# Install Maven
-RUN apt-get update && apt-get install -y maven
 
 # Copy the pom.xml and download dependencies
 COPY pom.xml .
