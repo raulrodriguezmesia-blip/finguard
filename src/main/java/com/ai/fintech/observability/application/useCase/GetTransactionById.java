@@ -2,11 +2,13 @@ package com.ai.fintech.observability.application.useCase;
 
 import com.ai.fintech.observability.application.port.TransactionRepository;
 import com.ai.fintech.observability.domain.model.Transaction;
+import org.springframework.stereotype.Service;
 
 /**
  * Caso de uso para obtener una transacción por su ID.
  * Implementa el patrón Query de CQRS.
  */
+@Service
 public class GetTransactionById {
     private final TransactionRepository transactionRepository;
 

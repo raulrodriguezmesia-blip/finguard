@@ -2,13 +2,14 @@ package com.ai.fintech.observability.application.useCase;
 
 import com.ai.fintech.observability.application.port.TransactionRepository;
 import com.ai.fintech.observability.domain.model.Transaction;
-
+import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
  * Caso de uso para listar todas las transacciones de un cliente.
  * Implementa el patrón Query de CQRS.
  */
+@Service
 public class ListCustomerTransactions {
     private final TransactionRepository transactionRepository;
 

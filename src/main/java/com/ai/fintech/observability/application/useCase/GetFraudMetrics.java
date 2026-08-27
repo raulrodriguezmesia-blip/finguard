@@ -2,11 +2,13 @@ package com.ai.fintech.observability.application.useCase;
 
 import com.ai.fintech.observability.application.port.FraudResultRepository;
 import com.ai.fintech.observability.application.port.FraudMetrics;
+import org.springframework.stereotype.Service;
 
 /**
  * Caso de uso para obtener métricas de fraude.
  * Implementa el patrón Query de CQRS.
  */
+@Service
 public class GetFraudMetrics {
     private final FraudResultRepository fraudResultRepository;
 
