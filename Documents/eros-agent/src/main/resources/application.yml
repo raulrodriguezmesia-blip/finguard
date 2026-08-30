@@ -1,0 +1,27 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: eros-agent
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/eros}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:admin123}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.eros.agent: INFO
