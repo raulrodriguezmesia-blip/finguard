@@ -11,11 +11,6 @@ on:
         default: 'false'
         type: boolean
 
-# Asignar permisos explícitos de lectura/escritura
-permissions:
-  contents: write
-  id-token: write
-
 env:
   AWS_REGION: us-east-1
   SAGEMAKER_S3_BUCKET: finguard-sagemaker-artifacts
@@ -25,18 +20,30 @@ env:
 jobs:
   retrain:
     runs-on: ubuntu-latest
+    # Principio de mínimo privilegio: Permisos específicos solo para el job retrain
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Mantiene el historial de Git para tagging/relaciones
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # Incluimos el Session Token por si usas credenciales temporales en AWS
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      # Paso de diagnóstico temprano
+      - name: Validate AWS credentials
+        run: |
+          echo "Validando identidad y credenciales de AWS..."
+          aws sts get-caller-identity
+          echo "Credenciales validadas correctamente."
 
       - name: Set up Python
         uses: actions/setup-python@v5
