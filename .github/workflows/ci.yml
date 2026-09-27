@@ -7,6 +7,9 @@ on:
     branches: [ master, main ]
   workflow_dispatch: # Permite ejecución manual desde la UI de GitHub Actions
 
+env:
+  MAVEN_OPTS: "-Dfile.encoding=UTF-8 -Djava.awt.headless=true"
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -21,21 +24,13 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-          cache: maven
-
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+          cache: maven # Gestor nativo de caché para .m2
 
       - name: Validate pom.xml
         run: mvn validate -B
 
       - name: Run tests
-        run: mvn verify -B
+        run: mvn verify -B -e
 
       - name: Upload test reports
         if: always()
@@ -87,7 +82,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Login en Azure previo al contexto de AKS
       - name: Azure Login
         uses: azure/login@v2
         with:
