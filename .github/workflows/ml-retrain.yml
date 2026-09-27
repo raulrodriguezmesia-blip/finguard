@@ -11,6 +11,11 @@ on:
         default: 'false'
         type: boolean
 
+# Asignar permisos explícitos de lectura/escritura
+permissions:
+  contents: write
+  id-token: write
+
 env:
   AWS_REGION: us-east-1
   SAGEMAKER_S3_BUCKET: finguard-sagemaker-artifacts
@@ -29,6 +34,8 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # Incluimos el Session Token por si usas credenciales temporales en AWS
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up Python
@@ -39,7 +46,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install boto3 scikit-learn joblib pandas numpy
 
       - name: Train and package model
