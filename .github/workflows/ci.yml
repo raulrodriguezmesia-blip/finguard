@@ -2,21 +2,20 @@ name: CI/CD - Fintech Platform
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
+  workflow_dispatch: # Permite ejecución manual desde la UI de GitHub Actions
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Needed for tags and branches
+          fetch-depth: 0
 
-      # Set up Java 21 (Temurin)
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -24,7 +23,6 @@ jobs:
           java-version: 21
           cache: maven
 
-      # Cache Maven dependencies
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
@@ -33,53 +31,39 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      # Validate pom.xml (fails fast on XML errors)
       - name: Validate pom.xml
         run: mvn validate -B
 
-      # Run full test suite (unit + integration tests)
       - name: Run tests
         run: mvn verify -B
 
-      # Upload test reports as artifacts
       - name: Upload test reports
-        if: always()  # Always run to collect test results even if tests fail
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path:
-            - "**/target/surefire-reports/"
-            - "**/target/failsafe-reports/"
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
           retention-days: 7
 
-      # Upload JAR file as artifact
       - name: Upload JAR artifact
-        if: success()  # Only upload if build succeeds
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: application-jar
-          path: target/observability-platform-1.0.0-SNAPSHOT.jar
+          path: target/*.jar
           retention-days: 30
 
   docker-build:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
-      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Set up Java 21 (needed for Maven build)
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: maven
-
-      # Log in to Azure Container Registry
       - name: Log in to Azure Container Registry
         uses: docker/login-action@v3
         with:
@@ -87,19 +71,14 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      # Build Docker image
-      - name: Build Docker image
+      - name: Build and Push Docker image
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} .
           docker tag finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG} finguarddevacr.azurecr.io/finguard-app:latest
-
-      # Push Docker image to ACR
-      - name: Push Docker image
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-        run: docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
+          docker push finguarddevacr.azurecr.io/finguard-app:${IMAGE_TAG}
+          docker push finguarddevacr.azurecr.io/finguard-app:latest
 
   deploy-aks:
     needs: docker-build
@@ -107,19 +86,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        
+
+      # Login en Azure previo al contexto de AKS
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Set KUBECONFIG for AKS
         uses: azure/aks-set-context@v4
         with:
           resource-group: rg-finguard-dev
           cluster-name: aks-finguard-dev
-          admin-client-id: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy manifests to AKS
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Update deployment with correct ACR image tag
           sed -i "s|:1.0.0|:${IMAGE_TAG}|g" ./k8s/finguard-deployment.yaml
           kubectl apply -f ./k8s/finguard-configmap.yaml
           kubectl apply -f ./k8s/finguard-deployment.yaml
